@@ -9,7 +9,7 @@ Labs content for 2017 QMUL MSc Bioinformatics BIO782P (Stats & bioinformatics) m
 | Tuesday 5th November 2019 | Basic statistics | Chi-squared, Student T | **Simple summary measures** | (CWK1 5%) Mean; median; contingency tables; difference statistics and Cis |
 | Weds 6th November 2019 | ANOVA and LMs | ANOVA and regression | **ANOVA, regression** | (CWK1 20%) Anova, regression |
 | Thursday 7th November 2019 | General linear models | Intro to GLM | **GLMs, error, interactions** | (CWK1 20%) GLMs |
-| Friday 8th November 2019 | More GLMs, Experimental design - design, power & replication | **Big data safari discussion groups** | Model Context | (CWK1 35%, CWK 2 35%) Appropriate selection, main assessment, reporting. |
+| Friday 8th November 2019 | More GLMs, Experimental design - design, power & replication | Big data safari discussion groups | **Model Context** | (CWK1 35%, CWK 2 35%) Appropriate selection, main assessment, reporting. |
 | Monday 11th November 2019 | Model selection & diagnostics | Model selection workshop | **Model selection** | (CWK2 20%) Model selection |
 | Tuesday 12th November 2019 |Beyond GLM | GLIM and mixed modelling workshops | **Logistic regression, Regression with count data, Fixed and Random effects** | (CWK2 10%) Model selection |
 | Wednesday 13th November 2019 | Intro to Multivariate analyses | Intro to multivariate workshop | **Intro to ordination, PCA** | (CWK2 5%) Plot data |
