@@ -1,0 +1,399 @@
+########################
+#Exercise 1: Exploratory analysis of transcriptomics data (35%)
+#For this exercise you worked on GEO dataset GDS5093, which contained gene expression data from
+#four populations: 
+
+
+
+#(a) patients infected with dengue fever; 
+#(b) patients with dengue hemorrhagic fever; 
+#(c) patients recovering from dengue fever and 
+#(d) healthy controls. 
+#Use R to visualise the relationships between the gene expression profiles of the four populations, and identify the genes
+#that show the most significant difference in expression between those populations. 
+#What biological inferences can you draw from your results?
+########################
+
+
+#Loading data into R
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install("GEOquery")
+
+rm(list = ls()) # clear the R environment 
+graphics.off() #clear the graphics environment 
+library(GEOquery)
+
+#Importing data from GEO
+gse <- getGEO("GDS5093", GSEMatrix = TRUE)
+
+X <- Table(gse)
+View(X) # use only with RStudio to view the contents of X
+
+geneNames <- as.character(X$IDENTIFIER)
+
+#Each row in X matrix is associated with a particular gene probe, which is identified by the spot ID_REF
+#(e.g. 1053_PM_at) and the gene name (e.g. RFC2). Each column is associated with a particular sample,
+#identified by its unique GEO ID, for example GSM1253056.
+
+#Convert GSE to an ExpressionSet object
+#To make full use of the Bioconductor functions for microarray analysis, it is necessary to convert the complex
+#gse structure into an ExpressionSet object using the GDS2eSet() function. The ExpressionSet class is
+#designed to combine several different sources of information into a single convenient structure.
+
+eset <- GDS2eSet(gse, do.log2=TRUE)
+eset
+
+featureNames(eset)[1:15]
+sampleNames(eset)[1:15]
+
+#phenotypic data summarise information about the samples. We can access the phenotypic data
+#using the pData() function. By applying the table() function, we can view the number of cases that are
+#considered as “control” vs. “Dengue virus”
+
+pDat <- pData(eset)
+pClass <- as.factor(pDat$disease.state)
+pClass
+
+
+
+
+X <- exprs(eset)
+rownames(X) <- geneNames
+
+summary(X)
+
+boxplot(X, las=2, col="steelblue") # las=2: the labels will be perpendicular to the axis
+
+controlIndx <- which((pClass == "healthy control") == TRUE)
+ConvalIndx <- which((pClass == "Convalescent" ) == TRUE)
+HemorrhagiclIndx <- which((pClass == "Dengue Hemorrhagic Fever") == TRUE)
+virusIndx <- which((pClass == "Dengue Fever") == TRUE)
+
+colour <- NULL
+colour[controlIndx] <- "green"  #Healthy patients
+colour[virusIndx] <- "red" #have DV
+colour[ConvalIndx ] <- "steelblue" #are recovering before wa
+colour[HemorrhagiclIndx] <- "orange" # have hemorrhagic DV before was violet 
+
+#par(mar = c(5, 4, 4, 8),                                  # Specify par parameters
+    #xpd = TRUE)
+boxplot(X, col=colour, las=2, main="Boxplot of different disease states")
+legend("topright", legend=c("Convalescent", "Hemorrhagic", "Dengue Fever","healthy control"), 
+       col=c("steelblue", "orange", "red", "green" ), lty=1, title="Disease States")
+
+#par(mar=c(5, 4, 4, 2) + 0.1)
+#need to figure out how to include legends just outside the boxes 
+
+
+#Scatter plot of Gene Expression level for the First 2 genes
+
+#par(mar = c(5, 4, 4, 8),                                  # Specify par parameters
+   # xpd = TRUE)
+plot(t(X), pch=21, bg=colour, main = "Scatter plot of Gene Expression level for the First 2 genes ")
+legend("topright", legend=c("Convalescent", "Hemorrhagic", "Dengue Fever","healthy control"), 
+       col=c("steelblue", "orange", "red", "green" ), pch=19,  
+       title="Disease States", inset = c(- 0.4,0))
+#par(mar=c(5, 4, 4, 2) + 0.1)
+#Pairs to see scatter plot of first 5 genes and difference in gene expression in different disease states 
+pairs(t(X)[,1:5], pch=21, bg =colour)
+
+#Assign the correct lables to the different data names 
+levels(pClass)[levels(pClass)=="Convalescent"] <- "Convalescent"
+levels(pClass)[levels(pClass)=="Dengue Hemorrhagic Fever" ] <- "HemorrhagicFever"
+levels(pClass)[levels(pClass)=="Dengue Fever" ] <- "DengueFever"
+levels(pClass)[levels(pClass)=="healthy control" ] <- "Control"
+table(pClass)
+
+
+
+
+
+#Cluster Analysis
+
+hc <- hclust(dist(t(X)))
+
+dend <- as.dendrogram(hc)
+# if the package does not exist use install.packages('dendextend')
+install.packages("dendextend")
+library(dendextend)
+colorCodes <- c(Convalescent="steelblue", Hemorrhagic="orange", Dengue_Fever= "red", healthy_control = "green")
+labels_colors(dend) <- colorCodes[pClass][order.dendrogram(dend)]
+par(mar=c(5.1, 4.1, 4.1, 2.1), mgp=c(3, 1, 0), las=0)
+plot(dend)
+legend("topright", legend=c("Convalescent", "Hemorrhagic", "Dengue Fever","healthy control"), 
+       col=c("steelblue", "orange", "red", "green" ), cex = 0.8, lty = 1, bty = "n")
+
+#We have carried out Hierarchial Clustering - so that we have grouped genes into clusters 
+#each cluster is distinct from each other cluster and the objects within each cluster are broadly similar to each other 
+
+heatmap(X[1:100,])
+#We create a heat map to graphically show the same information 
+
+library(gplots)
+heatmap.2(X[1:100,], col=redgreen(75), scale="row", key=T, keysize=1.5, density.info="none",
+          trace="none",cexCol=0.9)
+
+
+#Principal Component Analysis 
+# To carry out PCA we will use prcomp() function and SVD (Singular Value Decomposition) to perform PCA on our GEO data set
+
+Xpca<- prcomp(t(X), scale =TRUE)
+attributes(Xpca)
+
+s<- summary(Xpca)
+str(s)
+
+#Eplained Proportion of Variance 
+expVar <- s$importance[2,] * 100
+expVar
+
+barplot(expVar, xlab = "Principle Components", ylab= "Explained Variance (%)", col = "steelblue", ylim = c(0,20), main="Barplot of Proportion of Variance 
+        for each PC value")
+
+#Explained Cumulative Variance 
+cumVar<- s$importance[3,]* 100
+cumVar
+
+plot(cumVar, type = "o", col="black", pch=21, bg="blue", cex=0.8, ylab="Cumulative Variance",
+     xlab="Principal Components", main = "Cumulative Vairance of the PC values")
+
+Xscores <- Xpca$x
+
+#plot (Xscores, xlab="PC1", ylab="PC2")
+plot(Xscores, xlab="PC1", ylab="PC2", pch=21, cex.lab = 2 , cex.axis = 2, cex = 1.5, cex.main = 1.5,  bg=colour, main = "PCA Plots of the 4 disease states")
+legend("topright", bty= "n", legend=c("Convalescent", "Hemorrhagic", "Dengue Fever","healthy control"), col=c("steelblue", "orange", "red", "green" ), pch = 19)
+
+Xloadings<- Xpca$rotation
+biplot(Xloadings)
+#research how to do biplot and loadings to see how the different genes corespond to the PCA values
+
+
+#Differential Gene Expression
+#The identification of differentially expressed genes can help explain the differences between two conditions
+#or samples. We are therefore aiming to identify genes that are both statistically significant biologically
+#significant.
+#Using t.tests to determine the most significant genes
+#For each row (gene), we perform a t.test between the cases of “control” vs. “virus”. We will also store the
+#output p-values in a new vector, which we will later on use to find and filter out the most significant genes in
+#our input data.
+
+
+
+
+
+############################################################################################
+#t-tests
+########################################
+#Control vs DV
+########################################
+pValues <- c()
+for (i in 1:nrow(X)) {
+  res <- t.test(X[i,controlIndx],X[i,virusIndx])
+  pValues <- c(pValues, res$p.value)
+}
+
+names(pValues) <- geneNames
+topGenesIndx <- order(pValues)[1:50]
+topGeneNames <- geneNames[topGenesIndx]
+topGeneNames
+
+#now we have printed the top 50 genes with significant p-values from the t-test of control vs DV
+#now lets apply a PCA for the top 50 genes 
+
+Xpca <- prcomp(t(X[topGenesIndx, ]), scale. = TRUE)
+
+#Explained Variance
+expVar <- s$importance[2,] * 100
+expVar
+
+barplot(expVar, xlab = "Principal Components", ylab = "Explained Variance (%)",
+        col ="steelblue")
+
+
+# Cumulative Variance
+cumVar <- s$importance[3,] * 100
+cumVar
+
+plot(cumVar, type="o" ,col="black", pch=21, bg="blue", cex=0.8, ylab="Cumulative Variance",
+     xlab="Principal Components")
+
+
+Xscores <- Xpca$x
+plot(Xscores, xlab="PC1", ylab="PC2", pch=21, bg=colour, cex=0.7,
+     cex.lab=0.7, cex.axis = 0.7, main = "PCA plot of clusters of samples based on
+     top 50 significant genes identified by t-test of 
+     Healthy control vs DV ")
+legend("topright", bty= "n", legend=c("Convalescent", "Hemorrhagic", "Dengue Fever","healthy control"), col=c("steelblue", "orange", "red", "green" ), pch = 19,  title="Disease States", cex=0.8)
+#The differences amongst this cluster plot is due to the difference in exprission of the top 50 genes (in different patient populations)
+#Top 50 significant genes identified by t-test of control vs Dengue Virus 
+#can we see any common trends in the clustering
+#what can we say about the cumulative PCA based on the disease states i.e. if looking at healthy vs recovering does fewer PCA's explain 
+
+########################################
+#Control vs recovering 
+########################################
+pValues2 <- c()
+for (i in 1:nrow(X)) {
+  re2s <- t.test(X[i,controlIndx],X[i,ConvalIndx])
+  pValues2 <- c(pValues2, res2$p.value)
+}
+
+names(pValues2) <- geneNames
+topGenesIndx2 <- order(pValues2)[1:50]
+topGeneNames2 <- geneNames[topGenesIndx]
+topGeneNames2
+
+#now we have printed the top 50 genes with significant p-values from the t-test of control vs DV
+#now lets apply a PCA for the top 50 genes 
+
+Xpca2 <- prcomp(t(X[topGenesIndx2, ]), scale. = TRUE)
+
+
+#Explained Variance
+expVar2 <- s$importance[2,] * 100
+expVar2
+
+barplot(expVar2, xlab = "Principal Components", ylab = "Explained Variance (%)",
+        col ="steelblue")
+
+
+# Cumulative Variance
+cumVar2 <- s$importance[3,] * 100
+cumVar2
+
+plot(cumVar2, type="o" ,col="black", pch=21, bg="blue", cex=0.8, ylab="Cumulative Variance",
+     xlab="Principal Components")
+
+
+Xscores2 <- Xpca2$x
+plot(Xscores2, xlab="PC1", ylab="PC2", pch=21, bg=colour, cex=0.7,
+     cex.lab=0.7, cex.axis = 0.7, main = "PCA plot of clusters of samples based on
+     top 50 significant genes identified by t-test of 
+     Healthy control vs DV ")
+legend("topright", bty= "n", legend=c("Convalescent", "Hemorrhagic", "Dengue Fever","healthy control"), col=c("steelblue", "orange", "red", "green" ), pch = 19,  title="Disease States", cex=0.8)
+#The differences amongst this cluster plot is due to the difference in exprission of the top 50 genes (in different patient populations)
+#Top 50 significant genes identified by t-test of control vs Dengue Virus 
+#can we see any common trends in the clustering
+#what can we say about the cumulative PCA based on the disease states i.e. if looking at healthy vs recovering does fewer PCA's explain 
+
+
+
+
+
+
+
+
+
+
+
+#Differential Gene Expression 
+
+
+############################################################################################
+#volcano plot
+library(limma)
+
+design <- model.matrix(~0+pClass)
+head(design)
+design
+
+fit <- lmFit(X, design)
+contrasts <- makeContrasts(pClassConvalescent - pClassDengueFever, pClassConvalescent - pClassHemorrhagicFever, pClassConvalescent  - pClassControl, pClassDengueFever - pClassHemorrhagicFever, pClassDengueFever - pClassControl, pClassHemorrhagicFever - pClassControl, levels = design)
+fit <- contrasts.fit(fit, contrasts)
+fit <- eBayes(fit)
+toptable <- topTable(fit, sort.by="F", number=10)
+View(toptable)
+head(toptable)
+#How to interpretate the toptable for lima 
+
+
+hist(toptable$adj.P.Val, breaks=100, col='skyblue', border='slateblue', main='adjust P-value distribution for differentially expressed genes') 
+
+
+##### make a vacano plot ##################
+
+table(decideTests(fit)@.Data)
+#-1      0      1 
+#28687 271802  27801 
+
+#shows all our genes are downregulated across the different disease states 
+
+
+# Make a basic volcano plot
+#with(toptable, plot(logFC, -log10(P.Value), pch=20, main="Volcano plot"))
+#how to make the volcano plot and how to interpretate it 
+volcanoplot(fit, highlight= 10, names=geneNames, style ="p-value" , hl.col = "steelblue " )
+
+hist(toptable$adj.P.Val, breaks=100, col='skyblue', border='slateblue')
+
+topTable(fit, coef=1, adjust="BH")#the first coef gives us the top 10 significant genes for the first interaction of pClassConvalescent - pClassDengueFever
+#the second coef gives us the top 10 significant genes for the 2nd interaction in contracts i.e. pClassHemorrhagicFever, pClassConvalescent
+volcanoplot(fit)
+
+volcanoplot(fit, highlight = 10, names = geneNames, style = "p-value", main = "main")
+volcanoplot(fit, coef = 1,highlight = 10, names = geneNames, main = " Convalescent vs Dengue Fever")#helthy vs
+volcanoplot(fit, coef = 2,highlight = 10, names = geneNames, main = "Convalescent vs Hemorrhagic Fever")
+volcanoplot(fit, coef = 3,highlight = 10, names = geneNames, main = "Convalescent vs Control")
+volcanoplot(fit, coef = 4,highlight = 10, names = geneNames, main = "Dengue Fever vs Hemorrhagic Fever")
+volcanoplot(fit, coef = 5,highlight = 10, names = geneNames, main = "Dengue Fever vs Control")
+volcanoplot(fit, coef = 6,highlight = 10, names = geneNames, main = "Hemorrhagic Fever vs Control")
+
+
+#########################################################################################################
+
+
+#ANOVA
+#if using anova need heatmap 2
+
+pValues2 <- c()
+for (i in 1:nrow(X)) {
+  mod1 <- aov(X[i,] ~pDat$disease.state)
+  PvaluesGenes<- summary(mod1)[[1]][["Pr(>F)"]][[1]]
+  pValues2<- c(pValues2, PvaluesGenes)
+  pValues2
+}
+
+topGenesIndx3 <- order(pValues2)[1:50]
+topGeneNames3 <- geneNames[topGenesIndx3]
+topGeneNames3
+
+heatmap.2(X[topGeneNames3,], col=redgreen(75), scale="row", key=T, keysize=1.5, density.info="none",
+          trace="none",cexCol=0.9, labCol = pDat$disease.state)
+#upregulation and down regulation based on  control vs covalsecent and dv vs hemorrajagic virus gree n upregulated red down regulated 
+#do PCA for each one of this 
+
+Xpca3 <- prcomp(t(X[topGenesIndx3, ]), scale. = TRUE)
+s3<-summary(Xpca3) #make sure corresponding s changes 
+
+#Explained Variance
+expVar3 <- s3$importance[2,] * 100
+expVar3
+
+barplot(expVar3, xlab = "Principal Components", ylab = "Explained Variance (%)",
+        col ="steelblue", ylim = c(0,100))
+
+
+# Cumulative Variance
+cumVar3 <- s3$importance[3,] * 100
+cumVar3
+
+plot(cumVar3, type="o" ,col="black", pch=21, bg="blue", cex=0.8, ylab="Cumulative Variance",
+     xlab="Principal Components")
+
+
+Xscores3 <- Xpca3$x
+plot(Xscores3, xlab="PC1", ylab="PC2", pch=21, bg=colour, cex=0.7,
+     cex.lab=0.7, cex.axis = 0.7, main = "PCA plot of clusters of samples based on
+     top 50 significant genes identified by t-test of 
+     Healthy control vs DV ")
+legend("bottomleft", bty= "n", legend=c("Convalescent", "Hemorrhagic", "Dengue Fever","healthy control"), col=c("steelblue", "orange", "red", "green" ), pch = 19,  title="Disease States", cex=0.8)
+
+
+
+
+
+
+
+
